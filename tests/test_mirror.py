@@ -202,6 +202,22 @@ class MirrorTests(unittest.TestCase):
         self.assertEqual(s3.upload_count, 0)
         self.assertTrue(obj._get_state(sha, 15)['verified'])
 
+    def test_shared_registry_v2_layout_and_manifest_last(self):
+        obj, s3, source, sha = self.setup_mirror()
+        self.assertEqual(obj.blob_key(sha), "ollama/v2/blobs/sha256:" + sha)
+        raw_manifest = (b'{"schemaVersion":2,"config":{"digest":"sha256:' +
+                        sha.encode() + b'","size":15},"layers":[]}')
+        obj.manifest = lambda name, tag: (raw_manifest, {}, {sha: 15})
+        obj.run("library/demo", "small")
+        self.assertEqual(s3.objects["ollama/v2/manifests/library/demo/small"][0],
+                         raw_manifest)
+        self.assertEqual(s3.objects["ollama/v2/blobs/sha256:" + sha][0],
+                         source.data)
+        self.assertIn("ollama/_state/sha256-" + sha + ".json", s3.objects)
+        # One globally addressed digest can be used by several model names.
+        obj.mirror_blob("other/model", sha, 15)
+        self.assertEqual(source.get_count, 3)
+
     def test_wrong_checkpoint_identity_blocked(self):
         obj, s3, source, sha = self.setup_mirror()
         s3.objects[obj.state_key(sha)] = (b'{"digest":"invalid","size":15}', {})
