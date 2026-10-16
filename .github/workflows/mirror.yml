@@ -29,7 +29,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: mirror-${{ inputs.model }}-${{ inputs.s3_prefix }}
+  group: mirror-${{ inputs.s3_prefix }}
   cancel-in-progress: false
 
 jobs:
