@@ -1,0 +1,42 @@
+# Yandex API Gateway — native Ollama Registry V2 over read-only Cloud Function
+# Replace placeholders with the function ID and a service account allowed
+# to invoke the function (roles/functions.functionInvoker).
+# Do not put S3 credentials in the OpenAPI specification.
+openapi: 3.0.0
+info:
+  title: inf Ollama Registry V2
+  version: 1.0.0
+paths:
+  /v2/:
+    x-yc-apigateway-any-method:
+      operationId: registryProbe
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: REPLACE_WITH_FUNCTION_ID
+        service_account_id: REPLACE_WITH_INVOKER_SERVICE_ACCOUNT_ID
+        payload_format_version: "0.1"
+  /v2:
+    x-yc-apigateway-any-method:
+      operationId: registryProbeNoSlash
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: REPLACE_WITH_FUNCTION_ID
+        service_account_id: REPLACE_WITH_INVOKER_SERVICE_ACCOUNT_ID
+        payload_format_version: "0.1"
+  /{proxy+}:
+    x-yc-apigateway-any-method:
+      operationId: registryProxy
+      parameters:
+        - name: proxy
+          in: path
+          required: false
+          explode: false
+          style: simple
+          schema:
+            type: string
+            default: "-"
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: REPLACE_WITH_FUNCTION_ID
+        service_account_id: REPLACE_WITH_INVOKER_SERVICE_ACCOUNT_ID
+        payload_format_version: "0.1"
