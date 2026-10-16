@@ -7,6 +7,22 @@ info:
   title: inf Ollama Registry V2
   version: 1.0.0
 paths:
+  /v2/:
+    x-yc-apigateway-any-method:
+      operationId: registryProbe
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: REPLACE_WITH_FUNCTION_ID
+        service_account_id: REPLACE_WITH_INVOKER_SERVICE_ACCOUNT_ID
+        payload_format_version: "0.1"
+  /v2:
+    x-yc-apigateway-any-method:
+      operationId: registryProbeNoSlash
+      x-yc-apigateway-integration:
+        type: cloud_functions
+        function_id: REPLACE_WITH_FUNCTION_ID
+        service_account_id: REPLACE_WITH_INVOKER_SERVICE_ACCOUNT_ID
+        payload_format_version: "0.1"
   /{proxy+}:
     x-yc-apigateway-any-method:
       operationId: registryProxy
