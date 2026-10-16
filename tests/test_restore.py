@@ -139,6 +139,7 @@ class RestoreTests(unittest.TestCase):
         self.assertTrue(self.manifest_path().is_file())
 
     def test_retry_without_restart_resumes(self):
+        self.s3.fail_key = "ollama/blobs/sha256-" + self.blob_digest
         self.s3.fail_first_blob = True
         self.restorer(attempts=2).run(self.model, self.tag)
         self.assertIn("bytes=3-", self.s3.ranges)
