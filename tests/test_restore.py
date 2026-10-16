@@ -39,6 +39,7 @@ class S3ReadFake:
         self.objects = {}
         self.ranges = []
         self.fail_first_blob = False
+        self.fail_key = None
         self.malformed_range = False
         self.truncate_blob = False
 
@@ -58,7 +59,7 @@ class S3ReadFake:
         payload = data[offset:]
         if self.truncate_blob and "/blobs/" in Key:
             payload = payload[:-1]
-        if self.fail_first_blob and "/blobs/" in Key:
+        if self.fail_first_blob and Key == self.fail_key:
             self.fail_first_blob = False
             result["Body"] = FailingBody(payload, 3)
         else:
@@ -124,6 +125,7 @@ class RestoreTests(unittest.TestCase):
         self.assertEqual(calls, ["ollama/manifests/registry.ollama.ai/library/demo/small.json"])
 
     def test_resume_after_stream_failure_in_another_run(self):
+        self.s3.fail_key = "ollama/blobs/sha256-" + self.blob_digest
         self.s3.fail_first_blob = True
         with self.assertRaisesRegex(IOError, "dropped"):
             self.restorer().run(self.model, self.tag)
