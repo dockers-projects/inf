@@ -17,7 +17,33 @@ s3://YOUR_BUCKET/ollama/
   _state/sha256-<content-digest>.json           # durable multipart checkpoint
 ```
 
-The workflow copies **all unique blobs** referenced by the selected manifest (config, weights, template, projector etc.), then publishes the manifest **last**. The large weight blob can be downloaded directly as a file with `aws s3 cp --endpoint-url https://storage.yandexcloud.net s3://YOUR_BUCKET/ollama/blobs/sha256-... model.gguf` when the layer is actually a GGUF file. Not every model has exactly one weight layer or a `.gguf` representation; inspect the manifest's layer media types. This is an **archive/mirror**, not an S3 endpoint that the `ollama pull` CLI can consume directly. Restoring the native Ollama directory layout or serving an OCI registry is a separate task.
+The workflow copies **all unique blobs** referenced by the selected manifest (config, weights, template, projector etc.), then publishes the manifest **last**. The large weight blob can be downloaded directly as a file with `aws s3 cp --endpoint-url https://storage.yandexcloud.net s3://YOUR_BUCKET/ollama/blobs/sha256-... model.gguf` when the layer is actually a GGUF file. Not every model has exactly one weight layer or a `.gguf` representation; inspect the manifest's layer media types. This is an **archive/mirror**, not an S3 endpoint that the `ollama pull` CLI can consume directly. The complementary [`scripts/restore.py`](scripts/restore.py) helper reconstructs the native Ollama model directory from S3.
+
+## Restore from S3 and run with Ollama
+
+**Do not run `ollama run file_name` or `ollama run s3://...`.** Restore the native Ollama files (manifest + all blobs) into the directory used by the Ollama server, then run **the original model name**:
+
+```bash
+python -m pip install -r requirements.txt
+
+export YC_S3_ACCESS_KEY_ID='...'
+export YC_S3_SECRET_ACCESS_KEY='...'
+export YC_S3_BUCKET='YOUR_BUCKET'
+
+# Stop your Ollama server first and use its actual models directory:
+python scripts/restore.py gpt-oss:20b \
+  --bucket "$YC_S3_BUCKET" \
+  --prefix ollama \
+  --models-dir /path/to/ollama/models
+
+# Restart the Ollama server before checking:
+ollama list
+ollama run gpt-oss:20b
+```
+
+The restore script downloads from Yandex S3 with resumable byte-range reads to local `.part` files, validates the **whole SHA-256 of every blob**, and publishes the local manifest only when all files are valid. A second invocation reuses verified blobs. It **does not** redownload from the Ollama registry and does not require `ollama create`.
+
+The correct models directory depends on how Ollama runs (Linux systemd, Docker volume, macOS, custom `OLLAMA_MODELS`). **See [step-by-step restore documentation](docs/restore.md)** for systemd commands, Docker-volume guidance, permissions, failure recovery, and the separate GGUF + Modelfile alternative.
 
 ## Resuming and integrity
 
