@@ -87,11 +87,11 @@ class RestoreTests(unittest.TestCase):
                 {"digest": "sha256:" + self.blob_digest, "size": len(self.data)},
             ],
         }
-        self.s3.objects["ollama/manifests/registry.ollama.ai/library/demo/small.json"] = json.dumps(
+        self.s3.objects["ollama/v2/manifests/library/demo/small"] = json.dumps(
             self.manifest, separators=(",", ":")
         ).encode()
-        self.s3.objects["ollama/blobs/sha256-" + self.config_digest] = self.config
-        self.s3.objects["ollama/blobs/sha256-" + self.blob_digest] = self.data
+        self.s3.objects["ollama/v2/blobs/sha256:" + self.config_digest] = self.config
+        self.s3.objects["ollama/v2/blobs/sha256:" + self.blob_digest] = self.data
 
     def restorer(self, **kwargs):
         return restore.Restorer(self.s3, "private-bucket", "ollama", self.root,
@@ -107,7 +107,7 @@ class RestoreTests(unittest.TestCase):
         self.restorer().run(self.model, self.tag)
         self.assertEqual(self.blob_path().read_bytes(), self.data)
         self.assertEqual(self.manifest_path().read_bytes(),
-                         self.s3.objects["ollama/manifests/registry.ollama.ai/library/demo/small.json"])
+                         self.s3.objects["ollama/v2/manifests/library/demo/small"])
         self.assertFalse(self.manifest_path().with_suffix(".json").exists())
         self.assertEqual(len(self.s3.ranges), 0)
 
@@ -122,10 +122,10 @@ class RestoreTests(unittest.TestCase):
 
         self.s3.get_object = record
         self.restorer().run(self.model, self.tag)
-        self.assertEqual(calls, ["ollama/manifests/registry.ollama.ai/library/demo/small.json"])
+        self.assertEqual(calls, ["ollama/v2/manifests/library/demo/small"])
 
     def test_resume_after_stream_failure_in_another_run(self):
-        self.s3.fail_key = "ollama/blobs/sha256-" + self.blob_digest
+        self.s3.fail_key = "ollama/v2/blobs/sha256:" + self.blob_digest
         self.s3.fail_first_blob = True
         with self.assertRaisesRegex(IOError, "dropped"):
             self.restorer().run(self.model, self.tag)
@@ -139,13 +139,13 @@ class RestoreTests(unittest.TestCase):
         self.assertTrue(self.manifest_path().is_file())
 
     def test_retry_without_restart_resumes(self):
-        self.s3.fail_key = "ollama/blobs/sha256-" + self.blob_digest
+        self.s3.fail_key = "ollama/v2/blobs/sha256:" + self.blob_digest
         self.s3.fail_first_blob = True
         self.restorer(attempts=2).run(self.model, self.tag)
         self.assertIn("bytes=3-", self.s3.ranges)
 
     def test_sha_mismatch_does_not_publish_manifest(self):
-        self.s3.objects["ollama/blobs/sha256-" + self.blob_digest] = b"x" * len(self.data)
+        self.s3.objects["ollama/v2/blobs/sha256:" + self.blob_digest] = b"x" * len(self.data)
         with self.assertRaisesRegex(IOError, "SHA-256 mismatch"):
             self.restorer().run(self.model, self.tag)
         self.assertFalse(self.manifest_path().exists())
@@ -195,7 +195,7 @@ class RestoreTests(unittest.TestCase):
         self.assertEqual(destination.read_bytes(), b"leave alone")
 
     def test_missing_manifest_does_not_write(self):
-        self.s3.objects.pop("ollama/manifests/registry.ollama.ai/library/demo/small.json")
+        self.s3.objects.pop("ollama/v2/manifests/library/demo/small")
         with self.assertRaises(ClientError):
             self.restorer().run(self.model, self.tag)
         self.assertFalse(self.manifest_path().exists())
