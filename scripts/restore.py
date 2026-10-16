@@ -53,7 +53,7 @@ class Restorer:
 
     def _get_manifest(self, name, tag):
         key = prefix_key(
-            self.prefix, f"manifests/registry.ollama.ai/{name}/{tag}.json"
+            self.prefix, f"v2/manifests/{name}/{tag}"
         )
         response = self.s3.get_object(Bucket=self.bucket, Key=key)
         body = response["Body"]
@@ -106,7 +106,7 @@ class Restorer:
         if part.exists() and (not part.is_file() or part.stat().st_size > size):
             raise ValueError(f"Invalid partial download; inspect/remove manually: {part}")
 
-        key = prefix_key(self.prefix, "blobs/sha256-" + digest)
+        key = prefix_key(self.prefix, "v2/blobs/sha256:" + digest)
         for attempt in range(1, self.max_attempts + 1):
             offset = part.stat().st_size if part.exists() else 0
             if offset == size:
