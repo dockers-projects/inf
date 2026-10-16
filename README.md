@@ -8,16 +8,33 @@ Small, **manually triggered** GitHub Actions pipeline that mirrors models from t
 2. In GitHub **Settings → Secrets and variables → Actions**, add repository **secrets** `YC_S3_ACCESS_KEY_ID` and `YC_S3_SECRET_ACCESS_KEY`, and a repository **variable** `YC_S3_BUCKET` with the bucket name. Never put credentials in workflow inputs or in the public repository.
 3. Once the workflow is on the **default branch**, use **Actions → Mirror Ollama model to Yandex Object Storage → Run workflow**. Set `model` to `ollama pull gpt-oss:20b` (or simply `gpt-oss:20b`), optional `s3_prefix` (default `ollama`), and `part_mib` (default `32`). Start the same workflow again with identical inputs to resume an interrupted transfer.
 
-### S3 layout
+### S3 layout (Registry V2-ready)
 
 ```text
 s3://YOUR_BUCKET/ollama/
-  manifests/registry.ollama.ai/library/gpt-oss/20b.json
-  blobs/sha256-<content-digest>                 # raw Ollama blob, large model is often GGUF
-  _state/sha256-<content-digest>.json           # durable multipart checkpoint
+  v2/manifests/library/gpt-oss/20b              # raw OCI manifest
+  v2/blobs/sha256:<content-digest>              # shared, deduplicated blobs
+  _state/sha256-<content-digest>.json            # durable multipart checkpoint
 ```
 
-The workflow copies **all unique blobs** referenced by the selected manifest (config, weights, template, projector etc.), then publishes the manifest **last**. The large weight blob can be downloaded directly as a file with `aws s3 cp --endpoint-url https://storage.yandexcloud.net s3://YOUR_BUCKET/ollama/blobs/sha256-... model.gguf` when the layer is actually a GGUF file. Not every model has exactly one weight layer or a `.gguf` representation; inspect the manifest's layer media types. This is an **archive/mirror**, not an S3 endpoint that the `ollama pull` CLI can consume directly. The complementary [`scripts/restore.py`](scripts/restore.py) helper reconstructs the native Ollama model directory from S3.
+The workflow mirrors **all unique blobs** referenced by the selected manifest (config, weights, template, projector, etc.), checks the full end-to-end SHA-256 for each, and publishes the manifest **last**. All model tags share the same content-addressed blob storage, so identical weights are stored only once.
+
+### Native `ollama pull` via a tiny read-only Cloud Function
+
+Deploy the gateway described in **[Yandex Registry Gateway setup](docs/registry-gateway.md)**. It exposes public Registry V2 routes and signs temporary S3 GET URLs while keeping the S3 bucket private.
+
+```bash
+ollama pull YOUR_GATEWAY.apigw.yandexcloud.net/library/gpt-oss:20b
+ollama run YOUR_GATEWAY.apigw.yandexcloud.net/library/gpt-oss:20b
+```
+
+The function uses `gateway/gateway.py` and `gateway/apigateway.openapi.yaml`. It serves manifests directly and responds to blob GET requests with an HTTP **307 redirect** to a signed S3 URL. Ollama downloads weight data **directly from S3**, with its own checksum validation and resume. The function never proxies multi-GB files.
+
+**Security:** The storage bucket is private, but an unauthenticated public gateway makes mirrored model contents effectively **publicly downloadable**. Only mirror models permitted for redistribution; review [authentication and access trade-offs](docs/registry-gateway.md#critical-access-distinction). The gateway is not a write-capable registry.
+
+### Alternative: offline/managed restore
+
+If you do not want any accessible gateway, the complementary `scripts/restore.py` helper reconstructs the native Ollama model directory directly from your S3 credentials, preserving the original short model name.
 
 ## Restore from S3 and run with Ollama
 
