@@ -1,5 +1,7 @@
 # Restore a mirrored Ollama model from Yandex Object Storage
 
+This is the **optional offline alternative** to [native `ollama pull` through the Yandex API Gateway](registry-gateway.md). It avoids running a gateway and requires read-only S3 credentials on the target host.
+
 This is the **second half** of the pipeline:
 
 1. GitHub Actions mirrors the Ollama registry manifest plus content-addressed blobs into private Yandex S3.
@@ -127,7 +129,7 @@ This is **not equivalent** to restoring the native manifest: it may omit the ups
 ## Troubleshooting
 
 - **`ollama list` does not show the model:** check the `--models-dir` path used by the server, the manifest path and ownership, then restart Ollama. Avoid trying `ollama run` until the model appears locally, or Ollama may attempt to pull it from the internet.
-- **AccessDenied / NoSuchKey:** confirm S3 read permission and that GitHub Actions successfully published `ollama/manifests/registry.ollama.ai/library/MODEL/TAG.json`. The prefix and tag must match exactly.
+- **AccessDenied / NoSuchKey:** confirm S3 read permission and that GitHub Actions successfully published `ollama/v2/manifests/library/MODEL/TAG`. The prefix and tag must match exactly.
 - **SHA-256 mismatch:** downloaded bytes do not match the original registry digest. The helper does not publish the local manifest; inspect the S3 object, retry or re-mirror.
 - **Insufficient storage / permissions:** allow room for the downloaded blob and `.part` file on the same filesystem, and ensure that Ollama's service user can read the final files.
 - **`ollama run` still attempts network access:** it usually indicates Ollama does not see the local manifest. Check its service-side `OLLAMA_MODELS` and restart, rather than changing the model's name.
