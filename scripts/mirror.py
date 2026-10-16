@@ -99,7 +99,7 @@ class Mirror:
         self.max_attempts = max_attempts
 
     def blob_key(self, digest):
-        return prefix_key(self.prefix, "blobs/sha256-" + digest)
+        return prefix_key(self.prefix, "v2/blobs/sha256:" + digest)
 
     def state_key(self, digest):
         return prefix_key(self.prefix, "_state/sha256-" + digest + ".json")
@@ -300,7 +300,7 @@ class Mirror:
         LOG.info("Mirroring %s:%s (%d unique blobs)", name, tag, len(descriptors))
         for digest, size in descriptors.items():
             self.mirror_blob(name, digest, size)
-        key = prefix_key(self.prefix, f"manifests/registry.ollama.ai/{name}/{tag}.json")
+        key = prefix_key(self.prefix, f"v2/manifests/{name}/{tag}")
         self.s3.put_object(Bucket=self.bucket, Key=key, Body=raw,
                            ContentType="application/vnd.docker.distribution.manifest.v2+json")
         print(f"DONE s3://{self.bucket}/{key}")
